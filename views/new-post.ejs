@@ -1,0 +1,44 @@
+<%- include('partials/header') %>
+
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+          <h2 class="mb-0">Create New Blog Post</h2>
+        </div>
+        <div class="card-body">
+          <form action="/admin/new-post" method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+              <label for="title" class="form-label">Title</label>
+              <input type="text" class="form-control" id="title" name="title" required>
+            </div>
+            
+            <div class="mb-3">
+              <label for="excerpt" class="form-label">Excerpt</label>
+              <textarea class="form-control" id="excerpt" name="excerpt" rows="2" required></textarea>
+              <div class="form-text">A brief summary of your post that will appear on the homepage.</div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="content" class="form-label">Content</label>
+              <textarea class="form-control" id="content" name="content" rows="10" required></textarea>
+            </div>
+            
+            <div class="mb-3">
+              <label for="image" class="form-label">Featured Image</label>
+              <input class="form-control" type="file" id="image" name="image" accept="image/*">
+              <div class="form-text">Upload an image for your blog post (JPG, PNG, GIF - max 5MB).</div>
+            </div>
+            
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-primary">Publish Post</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

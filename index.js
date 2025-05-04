@@ -1,73 +1,269 @@
 import express from 'express'
+import multer from 'multer'
+import bodyParser from 'body-parser'
+import cookieParser from 'cookie-parser'
+import dotenv from 'dotenv'
 const app = express()
 const port = 3000 
+import { createClient } from '@supabase/supabase-js'
+dotenv.config()
 
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_ANON_KEY
+// Create a single supabase client for interacting with your database
+const supabase = createClient(supabaseUrl, supabaseKey)
+app.use(bodyParser.urlencoded({extended:true}))
+app.use(bodyParser.json())
+app.use(cookieParser())
 app.use(express.static('public'));
-// mock database
-const blogPosts = [
-    { 
-      id: 1,
-      title: "The Future of Web Design in 2025",
-      date: "April 20, 2025",
-      excerpt: "Explore the cutting-edge trends that are shaping the future of web design and how you can implement them in your projects.",
-      image: "https://cdn.mos.cms.futurecdn.net/xCSAEp8DjjrT2UQB87AoFN.jpg",
-      content: "As technology evolves, so does the world of web design. In 2025, we're seeing a push toward immersive experiences, AI-powered personalization, and seamless interactivity. From 3D elements to voice-driven interfaces, designers must embrace innovation while keeping accessibility at the forefront. Staying updated on design systems and leveraging tools like Figma and Framer can help designers adapt and lead the charge into the future."
-    },
-    { id: 2,
-      title: "10 UI/UX Principles Every Designer Should Know",
-      date: "April 18, 2025",
-      excerpt: "Master these fundamental principles of user interface and experience design to create engaging and intuitive digital products.",
-      image: "https://images.ctfassets.net/wp1lcwdav1p1/31dUrsGyucK0UNmJEQUqj3/3c57d917e84f6500ee2ec54e8760b854/UX_vs_UI.png?w=1500&q=60",
-      content: "Good design is invisible, and great design delights. These 10 principles—such as consistency, feedback, usability, and hierarchy—are essential for creating meaningful user experiences. By understanding user needs and behaviors, designers can craft interfaces that not only look good but also function seamlessly, ensuring user satisfaction and product success."
-    },
-    { id: 3,
-      title: "The Art of Minimalist Web Design",
-      date: "April 15, 2025",
-      excerpt: "Less is more. Discover how minimalist design principles can create powerful, effective, and beautiful websites that convert.",
-      image: "https://edu.sqi.ng/wp-content/uploads/2024/10/web-design.jpg",
-      content: "Minimalist web design strips away the unnecessary, focusing on clarity, usability, and visual hierarchy. White space, simple typography, and restrained color palettes define this approach. In 2025, minimalist sites load faster, offer better user experiences, and align well with mobile-first strategies—making them an ideal choice for modern brands."
-    },
-    { id: 4,
-      title: "Building Responsive Websites with Bootstrap 5",
-      date: "April 12, 2025",
-      excerpt: "Learn how to harness the power of Bootstrap 5 to create beautiful, responsive websites that look great on any device.",
-      image: "https://www.entheosweb.com/wp-content/uploads/2023/07/Responsive_tut_fimg.jpg",
-      content: "Bootstrap 5 offers powerful grid systems, utility classes, and components that make responsive web development easier than ever. With improvements in customization, JavaScript modularity, and RTL support, developers can quickly build layouts that adapt perfectly to any screen size. Learn how to structure your HTML and leverage Bootstrap's classes effectively."
-    },
-    { id: 5,
-      title: "Color Psychology in Web Design",
-      date: "April 10, 2025",
-      excerpt: "Understanding how colors affect user emotions and behaviors can dramatically improve your website's effectiveness.",
-      image: "https://studio1design.com/wp-content/uploads/2017/03/Studio1Design-BLOG-How-Important-is-Color-in-Website-Design-Images_IMAGE-2.jpg",
-      content: "Colors influence perception and decision-making. Blue can build trust, red evokes urgency, and green is associated with growth. By applying color psychology strategically, designers can guide user emotions, improve conversions, and reinforce brand identity. This post explores practical ways to apply color theory in UI/UX design."
-    },
-    { id: 6,
-      title: "5 JavaScript Frameworks to Watch in 2025",
-      date: "April 8, 2025",
-      excerpt: "Stay ahead of the curve with these cutting-edge JavaScript frameworks that are reshaping web development this year.",
-      image: "https://media.licdn.com/dms/image/v2/D5612AQGUWgFcX7PGaA/article-cover_image-shrink_600_2000/article-cover_image-shrink_600_2000/0/1695478890123?e=2147483647&v=beta&t=m78k-HmAQAiREy6-MEiZDubMoJZczrsduLrL9IYljWc",
-      content: "From SolidJS to Qwik and new iterations of Svelte and Vue, 2025 is a transformative year for JavaScript frameworks. These tools offer performance improvements, better DX (developer experience), and more modular architectures. Learn what makes each one unique, where they shine, and how to decide which framework suits your project best."
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max file size
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept images only
+    if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+      return cb(new Error('Only image files are allowed!'), false);
     }
-  ];
+    cb(null, true);
+  }
+});
+const authenticateUser = async (req,res,next) =>{
+  const token = req.cookies.authToken
+  if (!token) {
+   return res.redirect('/login')
+  }
+  try {
+    const {data: {user}, error} = await supabase.auth.getUser(token)
+    if (error || !user) {
+    res.clearCookie('authToken')
+    return res.redirect('/login')
+    }
+    req.user = user
+    next()
+  } catch (error) {
+    console.error('Authentication error:', error)
+    res.clearCookie('authToken')
+    res.redirect('/login')
+  }
+}
+
 
   // routes
-app.get('/',(req,res)=>{
+app.get('/',authenticateUser, async (req,res)=>{
+ try {
+  const {data: blogPosts, error}= await supabase
+  .from('blog_posts')
+  .select('*')
+  .order('created_at', {ascending:false})
+  if (error) throw error
     res.render('index.ejs',
         {
             title: 'Morden blogs',
-            blogPosts: blogPosts
+            blogPosts: blogPosts, 
+            user: req.user || null
         }
     )
+    console.log(req.user)
+ } catch (error) {
+  console.error('Error fetch posts:',error)
+  res.status(500).render('error.ejs',{message: 'failed to load blog post'})
+ }
 })
-  app.get('/blog/:id',(req,res)=>{
-      const postId= parseInt(req.params.id)
-      const post= blogPosts.find(post => post.id ===postId)
-      res.render('blog.ejs',{
-        title: post.title,
-        post: post
-      })
+  app.get('/blog/:id',authenticateUser, async(req,res)=>{
+     
+      try {
+        const postId= parseInt(req.params.id)
+        const {data: post, error}= await supabase
+        .from('blog_posts')
+        .select('*')
+        .eq('id', postId)
+        .single()
+       
+        if (error) throw error
+        res.render('blog.ejs',{
+          title: post.title,
+          post: post,
+        user: req.user
+        })
+       } catch (error) {
+        console.error('Error fetch posts:',error)
+        res.status(500).render('error.ejs',{message: 'failed to load blog post'})
+       }
+     
   })
-
+  app.get('/login', (req,res)=>{
+    res.render('login.ejs', {
+    title: 'login',
+    error: null
+    })
+  })
+   app.post('/login',async (req,res)=>{
+    const {email,password}= req.body 
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email ,
+        password ,
+      })
+      if (error) throw error
+      res.cookie('authToken', data.session.access_token,{
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7* 24 * 60 * 60 * 1000
+      })
+      res.redirect('/')
+    } catch (error) {
+      console.error('login error', error)
+      res.render('login.ejs', {
+      title: 'Login',
+      error: error.message || 'Invalid email or password' 
+      })
+    }
+   })
+   app.get('/signup', (req,res)=>{
+    res.render('signup.ejs', {
+    title: 'signup',
+    error: null
+    })
+  })
+   app.post('/signup',async (req,res)=>{
+    const {email,password}= req.body 
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email ,
+        password ,
+      })
+      if (error) throw error 
+      if (data.session) {
+        res.cookie('authToken', data.session.access_token,{
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: 7* 24 * 60 * 60 * 1000
+          })
+          res.redirect('/')
+      }
+     
+      res.render('confirm-email.ejs',{
+      title: 'Confirm Your Email',
+      email: email
+      })
+    } catch (error) {
+      console.error('signup error', error)
+      res.render('signup.ejs', {
+      title: 'signup',
+      error: error.message || 'failed to create an account' 
+      })
+    }
+   })
+   app.get('/logout',(req,res)=>{
+   res.clearCookie('authToken')
+   res.redirect('/')
+   })
+   app.get('/admin/new-post',authenticateUser,(req,res)=>{
+    res.render('new-post.ejs', {
+    title: 'add a new blog',
+    user: req.user 
+    })
+    console.log(req.user)
+   })
+   app.post('/admin/new-post',authenticateUser, upload.single('image'), async (req,res)=>{
+    try {
+      const { title, excerpt, content } = req.body;
+      let imageUrl = "/api/placeholder/800/500"; // Default image
+      
+      // Upload image to Supabase Storage if provided
+      if (req.file) {
+        const fileName = `${Date.now()}-${req.file.originalname}`;
+        const { data, error } = await supabase
+          .storage
+          .from('blog-images')
+          .upload(fileName, req.file.buffer, {
+            contentType: req.file.mimetype
+          });
+        
+        if (error) throw error;
+        
+        // Get public URL
+        const { data: urlData } = supabase
+          .storage
+          .from('blog-images')
+          .getPublicUrl(fileName);
+        
+        imageUrl = urlData.publicUrl;
+      }
+      
+      // Format current date
+      const today = new Date();
+      const monthNames = ["January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const formattedDate = `${monthNames[today.getMonth()]} ${today.getDate()}, ${today.getFullYear()}`;
+      
+      // Insert post into Supabase
+      const { data, error } = await supabase
+        .from('blog_posts')
+        .insert([
+          {
+            title,
+            excerpt,
+            content,
+            image: imageUrl,
+            date: formattedDate,
+            author_id: req.user.id
+          }
+        ]);
+      
+      if (error) throw error;
+      
+      // Redirect to home page
+      res.redirect('/');
+    } catch (error) {
+      console.error('Error creating post:', error);
+      res.status(500).render('error', { message: 'Failed to create blog post' });
+    }
+   })
+   app.get('/contact', authenticateUser,(req, res) => {
+    res.render('contact.ejs', { 
+      title: 'Contact Us',
+      user: req.user || null,
+      success: false,
+      error: null
+    });
+  });
+  app.get('/about', authenticateUser,(req, res) => {
+    res.render('about.ejs', { 
+      title: 'About Us',
+      user: req.user || null
+    });
+  });
+  app.post('/contact', async (req, res) => {
+    try {
+      const { name, email, subject, message } = req.body;
+      
+      
+      
+       const { data, error } = await supabase
+        .from('contact_messages')
+        .insert([{ name, email, subject, message }]);
+      
+      res.render('contact.ejs', { 
+        title: 'Contact Us',
+        user: req.user || null,
+        success: true,
+        error: null
+      });
+    } catch (error) {
+      console.error('Contact form error:', error);
+      res.render('contact.ejs', { 
+        title: 'Contact Us',
+        user: req.user || null,
+        success: false,
+        error: 'Failed to send your message. Please try again later.'
+      });
+    }
+  });
 app.listen(port,() =>{
     console.log(`Server runing on port 3000`)
 })

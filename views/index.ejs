@@ -12,8 +12,8 @@
                     <div class="blog-date">
                         <i class="far fa-calender-alt"><%= post.date %></i>
                     </div>
-                    <h3 class="blog-title"><%= post.title %></h3>
-                    <p class="blog-excerpt"><%= post.excerpt %></p>
+                    <h3 class="blog-title"><%= post.title.slice(0,50)%></h3>
+                    <p class="blog-excerpt"><%= post.excerpt.slice(0,100)%>...</p>
                     <button class="read-more"><a href="/blog/<%= post.id %>" class="text-white text-decoration-none">read more</a></button>
                 </div>
             </div>
